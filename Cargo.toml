@@ -1,0 +1,32 @@
+[package]
+name = "alice-fix"
+version = "0.1.0"
+edition = "2021"
+authors = ["Moroya Sakamoto"]
+description = "FIX protocol 4.4/5.0 message parser, builder, and session management"
+license = "MIT"
+publish = false
+
+[lib]
+name = "alice_fix"
+crate-type = ["rlib"]
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+alice-ledger = { path = "../ALICE-Ledger" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.bench]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = false
