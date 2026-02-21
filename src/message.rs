@@ -6,14 +6,15 @@
 //! FIX message representation.
 //!
 //! A [`FixMessage`] holds the parsed contents of a single FIX frame.
-//! Tags are stored in a [`BTreeMap`] for deterministic, ascending iteration
-//! order, which simplifies testing and logging.
+//! Tags are stored in a [`HashMap`] for O(1) lookup on the hot path.
+//! Iteration order is not guaranteed; sort the keys explicitly when
+//! deterministic output is required (e.g., in tests or logging).
 //!
 //! The structural tags 8 (BeginString), 9 (BodyLength), and 10 (Checksum)
 //! are not stored in [`FixMessage::fields`]; they are either captured in
 //! dedicated fields or reconstructed at serialisation time by [`crate::builder`].
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 /// A parsed FIX message.
 ///
@@ -26,7 +27,8 @@ pub struct FixMessage {
     /// Message type from tag 35 (e.g., "D" for NewOrderSingle, "8" for ExecutionReport).
     pub msg_type: String,
     /// All non-structural tag/value pairs keyed by tag number.
-    pub fields: BTreeMap<u32, String>,
+    /// Uses [`HashMap`] for O(1) lookup on the hot path.
+    pub fields: HashMap<u32, String>,
 }
 
 impl FixMessage {
@@ -36,7 +38,7 @@ impl FixMessage {
         Self {
             begin_string: begin_string.to_string(),
             msg_type: msg_type.to_string(),
-            fields: BTreeMap::new(),
+            fields: HashMap::new(),
         }
     }
 
@@ -50,6 +52,8 @@ impl FixMessage {
     }
 
     /// Retrieve the string value for a tag, or `None` if absent.
+    ///
+    /// O(1) average — backed by [`HashMap`].
     #[inline(always)]
     pub fn get(&self, tag: u32) -> Option<&str> {
         self.fields.get(&tag).map(String::as_str)
