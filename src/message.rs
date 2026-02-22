@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 /// A parsed FIX message.
 ///
-/// Structural framing tags (8, 9, 10) are excluded from [`fields`]; they are
+/// Structural framing tags (8, 9, 10) are excluded from [`Self::fields`]; they are
 /// handled by the parser and builder layers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FixMessage {
@@ -157,5 +157,150 @@ mod tests {
         assert_eq!(msg.get(tag::SENDER_COMP_ID), Some("A"));
         assert_eq!(msg.get(tag::TARGET_COMP_ID), Some("B"));
         assert_eq!(msg.get(tag::SYMBOL), Some("BTCUSD"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional tests for edge cases and coverage
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_get_u64_non_numeric_returns_none() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::ORDER_QTY, "abc");
+        assert_eq!(msg.get_u64(tag::ORDER_QTY), None);
+    }
+
+    #[test]
+    fn test_get_u64_negative_returns_none() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::ORDER_QTY, "-5");
+        assert_eq!(msg.get_u64(tag::ORDER_QTY), None);
+    }
+
+    #[test]
+    fn test_get_i64_float_returns_none() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::PRICE, "100.50");
+        assert_eq!(msg.get_i64(tag::PRICE), None);
+    }
+
+    #[test]
+    fn test_empty_value() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::TEXT, "");
+        assert_eq!(msg.get(tag::TEXT), Some(""));
+    }
+
+    #[test]
+    fn test_empty_begin_string() {
+        let msg = FixMessage::new("", "D");
+        assert_eq!(msg.begin_string, "");
+        assert_eq!(msg.msg_type, "D");
+    }
+
+    #[test]
+    fn test_empty_msg_type() {
+        let msg = FixMessage::new("FIX.4.4", "");
+        assert_eq!(msg.msg_type, "");
+    }
+
+    #[test]
+    fn test_fix50_begin_string() {
+        let msg = FixMessage::new("FIXT.1.1", "D");
+        assert_eq!(msg.begin_string, "FIXT.1.1");
+    }
+
+    #[test]
+    fn test_large_tag_number() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(9999, "custom_value");
+        assert_eq!(msg.get(9999), Some("custom_value"));
+    }
+
+    #[test]
+    fn test_set_many_fields() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        for i in 100..200 {
+            msg.set(i, &format!("val_{i}"));
+        }
+        assert_eq!(msg.fields.len(), 100);
+        assert_eq!(msg.get(150), Some("val_150"));
+    }
+
+    #[test]
+    fn test_clone_independence() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::SYMBOL, "BTCUSD");
+        let mut clone = msg.clone();
+        clone.set(tag::SYMBOL, "ETHUSD");
+        assert_eq!(msg.get(tag::SYMBOL), Some("BTCUSD"));
+        assert_eq!(clone.get(tag::SYMBOL), Some("ETHUSD"));
+    }
+
+    #[test]
+    fn test_equality() {
+        let mut a = FixMessage::new("FIX.4.4", "D");
+        a.set(tag::SYMBOL, "BTCUSD");
+        let mut b = FixMessage::new("FIX.4.4", "D");
+        b.set(tag::SYMBOL, "BTCUSD");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_inequality_different_msg_type() {
+        let a = FixMessage::new("FIX.4.4", "D");
+        let b = FixMessage::new("FIX.4.4", "8");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_get_i64_zero() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::PRICE, "0");
+        assert_eq!(msg.get_i64(tag::PRICE), Some(0));
+    }
+
+    #[test]
+    fn test_get_u64_zero() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::ORDER_QTY, "0");
+        assert_eq!(msg.get_u64(tag::ORDER_QTY), Some(0));
+    }
+
+    #[test]
+    fn test_get_i64_max() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::PRICE, &i64::MAX.to_string());
+        assert_eq!(msg.get_i64(tag::PRICE), Some(i64::MAX));
+    }
+
+    #[test]
+    fn test_get_u64_max() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::ORDER_QTY, &u64::MAX.to_string());
+        assert_eq!(msg.get_u64(tag::ORDER_QTY), Some(u64::MAX));
+    }
+
+    #[test]
+    fn test_get_i64_overflow_returns_none() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        // u64::MAX cannot be parsed as i64
+        msg.set(tag::PRICE, &u64::MAX.to_string());
+        assert_eq!(msg.get_i64(tag::PRICE), None);
+    }
+
+    #[test]
+    fn test_special_characters_in_value() {
+        let mut msg = FixMessage::new("FIX.4.4", "D");
+        msg.set(tag::TEXT, "Hello World! @#$%^&*()");
+        assert_eq!(msg.get(tag::TEXT), Some("Hello World! @#$%^&*()"));
+    }
+
+    #[test]
+    fn test_hashmap_is_o1_lookup() {
+        // Confirm FixMessage uses HashMap (not BTreeMap) for O(1) field lookup.
+        // This is a compile-time design verification: fields is HashMap<u32, String>.
+        let msg = FixMessage::new("FIX.4.4", "D");
+        let _fields: &HashMap<u32, String> = &msg.fields;
     }
 }

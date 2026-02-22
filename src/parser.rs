@@ -61,7 +61,10 @@ impl core::fmt::Display for ParseError {
             ParseError::MissingBodyLength => write!(f, "missing BodyLength (tag 9)"),
             ParseError::MissingChecksum => write!(f, "missing or misplaced Checksum (tag 10)"),
             ParseError::InvalidChecksum { expected, actual } => {
-                write!(f, "invalid checksum: expected {expected:03}, actual {actual:03}")
+                write!(
+                    f,
+                    "invalid checksum: expected {expected:03}, actual {actual:03}"
+                )
             }
             ParseError::MalformedField(s) => write!(f, "malformed field: {s}"),
             ParseError::InvalidTag(s) => write!(f, "invalid tag number: {s}"),
@@ -91,18 +94,14 @@ fn split_field(field: &[u8]) -> Result<(u32, &[u8]), ParseError> {
     let eq = field
         .iter()
         .position(|&b| b == b'=')
-        .ok_or_else(|| ParseError::MalformedField(
-            String::from_utf8_lossy(field).into_owned(),
-        ))?;
+        .ok_or_else(|| ParseError::MalformedField(String::from_utf8_lossy(field).into_owned()))?;
 
     let tag_bytes = &field[..eq];
     let value_bytes = &field[eq + 1..];
 
     // Parse the tag number from ASCII digits without allocating a String.
     let tag = parse_tag_number(tag_bytes)
-        .ok_or_else(|| ParseError::InvalidTag(
-            String::from_utf8_lossy(tag_bytes).into_owned(),
-        ))?;
+        .ok_or_else(|| ParseError::InvalidTag(String::from_utf8_lossy(tag_bytes).into_owned()))?;
 
     Ok((tag, value_bytes))
 }
@@ -205,8 +204,7 @@ pub fn parse(input: &[u8]) -> Result<FixMessage, ParseError> {
     let body_start = tag8_field_len + tag9_field_len;
 
     // Parse the declared body length without allocating a String.
-    let declared_len = parse_body_length(body_len_bytes)
-        .ok_or(ParseError::MissingBodyLength)?;
+    let declared_len = parse_body_length(body_len_bytes).ok_or(ParseError::MissingBodyLength)?;
 
     // The checksum field ("10=XXX\x01") is always exactly 7 bytes.
     let checksum_field_len = 7_usize;
@@ -235,8 +233,8 @@ pub fn parse(input: &[u8]) -> Result<FixMessage, ParseError> {
         match t {
             _ if t == tag::CHECKSUM => {
                 // Validate the checksum value without allocating on the error path.
-                let expected_chk = parse_checksum_value(v_bytes)
-                    .ok_or(ParseError::InvalidChecksum {
+                let expected_chk =
+                    parse_checksum_value(v_bytes).ok_or(ParseError::InvalidChecksum {
                         expected: 0,
                         actual: actual_chk,
                     })?;
@@ -250,14 +248,10 @@ pub fn parse(input: &[u8]) -> Result<FixMessage, ParseError> {
             }
             _ if t == tag::MSG_TYPE => {
                 // Zero-copy: interpret v_bytes as UTF-8 in-place, then own.
-                msg_type = core::str::from_utf8(v_bytes)
-                    .unwrap_or("")
-                    .to_string();
+                msg_type = core::str::from_utf8(v_bytes).unwrap_or("").to_string();
             }
             _ => {
-                let value = core::str::from_utf8(v_bytes)
-                    .unwrap_or("")
-                    .to_string();
+                let value = core::str::from_utf8(v_bytes).unwrap_or("").to_string();
                 fields.insert(t, value);
             }
         }
@@ -267,9 +261,7 @@ pub fn parse(input: &[u8]) -> Result<FixMessage, ParseError> {
         return Err(ParseError::MissingChecksum);
     }
 
-    let begin_string = core::str::from_utf8(begin_bytes)
-        .unwrap_or("")
-        .to_string();
+    let begin_string = core::str::from_utf8(begin_bytes).unwrap_or("").to_string();
 
     Ok(FixMessage {
         begin_string,
@@ -389,5 +381,236 @@ mod tests {
         assert_eq!(msg.get(tag::SYMBOL), Some("BTCUSD"));
         assert_eq!(msg.get_i64(tag::PRICE), Some(50000));
         assert_eq!(msg.get_u64(tag::ORDER_QTY), Some(10));
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional parser tests: edge cases and error paths
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_parse_error_display_empty_input() {
+        assert_eq!(format!("{}", ParseError::EmptyInput), "empty input");
+    }
+
+    #[test]
+    fn test_parse_error_display_missing_begin_string() {
+        assert_eq!(
+            format!("{}", ParseError::MissingBeginString),
+            "missing BeginString (tag 8)"
+        );
+    }
+
+    #[test]
+    fn test_parse_error_display_missing_body_length() {
+        assert_eq!(
+            format!("{}", ParseError::MissingBodyLength),
+            "missing BodyLength (tag 9)"
+        );
+    }
+
+    #[test]
+    fn test_parse_error_display_missing_checksum() {
+        assert_eq!(
+            format!("{}", ParseError::MissingChecksum),
+            "missing or misplaced Checksum (tag 10)"
+        );
+    }
+
+    #[test]
+    fn test_parse_error_display_invalid_checksum() {
+        let err = ParseError::InvalidChecksum {
+            expected: 100,
+            actual: 200,
+        };
+        assert_eq!(
+            format!("{err}"),
+            "invalid checksum: expected 100, actual 200"
+        );
+    }
+
+    #[test]
+    fn test_parse_error_display_malformed_field() {
+        let err = ParseError::MalformedField("no_equals".to_string());
+        assert_eq!(format!("{err}"), "malformed field: no_equals");
+    }
+
+    #[test]
+    fn test_parse_error_display_invalid_tag() {
+        let err = ParseError::InvalidTag("abc".to_string());
+        assert_eq!(format!("{err}"), "invalid tag number: abc");
+    }
+
+    #[test]
+    fn test_parse_error_clone_and_eq() {
+        let a = ParseError::EmptyInput;
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_parse_single_byte_not_soh() {
+        // A single non-SOH byte is not a valid message.
+        let result = parse(b"X");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_only_soh_bytes() {
+        // All SOH bytes produce no fields -> MissingBeginString.
+        let result = parse(b"\x01\x01\x01");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_malformed_field_no_equals() {
+        // A field without '=' separator.
+        let result = parse(b"8FIX.4.4\x01");
+        assert!(matches!(result, Err(ParseError::MalformedField(_))));
+    }
+
+    #[test]
+    fn test_parse_invalid_tag_non_numeric() {
+        // Tag is not a number.
+        let result = parse(b"abc=xyz\x01");
+        assert!(matches!(result, Err(ParseError::InvalidTag(_))));
+    }
+
+    #[test]
+    fn test_parse_fixt11_version() {
+        let bytes = FixBuilder::new("FIXT.1.1", "0")
+            .field(tag::SENDER_COMP_ID, "A")
+            .field(tag::TARGET_COMP_ID, "B")
+            .field(tag::MSG_SEQ_NUM, "1")
+            .build();
+        let msg = parse(&bytes).expect("FIXT.1.1 should parse");
+        assert_eq!(msg.begin_string, "FIXT.1.1");
+        assert_eq!(msg.msg_type, "0");
+    }
+
+    #[test]
+    fn test_parse_preserves_text_field() {
+        let bytes = FixBuilder::new("FIX.4.4", "0")
+            .field(tag::SENDER_COMP_ID, "S")
+            .field(tag::TEXT, "Hello FIX World")
+            .build();
+        let msg = parse(&bytes).expect("should parse");
+        assert_eq!(msg.get(tag::TEXT), Some("Hello FIX World"));
+    }
+
+    #[test]
+    fn test_parse_checksum_integrity() {
+        // Build a valid message, verify the checksum is correct by re-parsing.
+        let bytes = FixBuilder::new("FIX.4.4", "A")
+            .field(tag::SENDER_COMP_ID, "ALICE")
+            .field(tag::TARGET_COMP_ID, "EXCHANGE")
+            .field(tag::MSG_SEQ_NUM, "999")
+            .build();
+        let msg = parse(&bytes);
+        assert!(msg.is_ok());
+    }
+
+    #[test]
+    fn test_field_iter_skips_empty_segments() {
+        // Build a message with the builder (no consecutive SOH issue),
+        // but confirm parsing succeeds as expected.
+        let bytes = FixBuilder::new("FIX.4.4", "0")
+            .field(tag::SENDER_COMP_ID, "X")
+            .build();
+        let msg = parse(&bytes).expect("should parse");
+        assert_eq!(msg.get(tag::SENDER_COMP_ID), Some("X"));
+    }
+
+    #[test]
+    fn test_parse_body_length_mismatch() {
+        // Manually construct a message with wrong body length.
+        // "8=FIX.4.4\x019=999\x0135=0\x0110=000\x01"
+        let bad = b"8=FIX.4.4\x019=999\x0135=0\x0110=000\x01";
+        let result = parse(bad);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compute_checksum_empty() {
+        assert_eq!(compute_checksum(&[]), 0);
+    }
+
+    #[test]
+    fn test_compute_checksum_known_value() {
+        // Sum of [0x41, 0x42, 0x43] = 65+66+67 = 198
+        assert_eq!(compute_checksum(b"ABC"), 198);
+    }
+
+    #[test]
+    fn test_compute_checksum_wraps_at_256() {
+        // 256 bytes of 0x01 = sum 256, mod 256 = 0
+        let data = vec![1u8; 256];
+        assert_eq!(compute_checksum(&data), 0);
+    }
+
+    #[test]
+    fn test_parse_tag_number_empty() {
+        assert_eq!(parse_tag_number(b""), None);
+    }
+
+    #[test]
+    fn test_parse_tag_number_valid() {
+        assert_eq!(parse_tag_number(b"49"), Some(49));
+        assert_eq!(parse_tag_number(b"0"), Some(0));
+        assert_eq!(parse_tag_number(b"999999"), Some(999999));
+    }
+
+    #[test]
+    fn test_parse_tag_number_non_digit() {
+        assert_eq!(parse_tag_number(b"12x"), None);
+        assert_eq!(parse_tag_number(b"abc"), None);
+    }
+
+    #[test]
+    fn test_parse_body_length_empty() {
+        assert_eq!(parse_body_length(b""), None);
+    }
+
+    #[test]
+    fn test_parse_body_length_valid() {
+        assert_eq!(parse_body_length(b"42"), Some(42));
+        assert_eq!(parse_body_length(b"0"), Some(0));
+    }
+
+    #[test]
+    fn test_parse_checksum_value_empty() {
+        assert_eq!(parse_checksum_value(b""), None);
+    }
+
+    #[test]
+    fn test_parse_checksum_value_valid() {
+        assert_eq!(parse_checksum_value(b"000"), Some(0));
+        assert_eq!(parse_checksum_value(b"127"), Some(127));
+        assert_eq!(parse_checksum_value(b"255"), Some(255));
+    }
+
+    #[test]
+    fn test_parse_checksum_value_wraps_at_256() {
+        // 256 & 0xFF = 0
+        assert_eq!(parse_checksum_value(b"256"), Some(0));
+    }
+
+    #[test]
+    fn test_split_field_valid() {
+        let (tag, val) = split_field(b"49=ALICE").unwrap();
+        assert_eq!(tag, 49);
+        assert_eq!(val, b"ALICE");
+    }
+
+    #[test]
+    fn test_split_field_empty_value() {
+        let (tag, val) = split_field(b"58=").unwrap();
+        assert_eq!(tag, 58);
+        assert_eq!(val, b"");
+    }
+
+    #[test]
+    fn test_split_field_no_equals() {
+        let result = split_field(b"no_equals_here");
+        assert!(matches!(result, Err(ParseError::MalformedField(_))));
     }
 }

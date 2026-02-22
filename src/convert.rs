@@ -8,9 +8,9 @@
 //! All FIX tag values are plain string slices following the FIX 4.4
 //! specification. ALICE-Ledger types are defined in the `alice_ledger` crate.
 
-use alice_ledger::{Fill, OrderId, OrderType, Side, TimeInForce};
 use crate::message::FixMessage;
 use crate::tag;
+use alice_ledger::{Fill, OrderId, OrderType, Side, TimeInForce};
 
 // ---------------------------------------------------------------------------
 // Side
@@ -198,7 +198,10 @@ mod tests {
 
         assert_eq!(alice_ord_type_to_fix(OrderType::Market), "1");
         assert_eq!(alice_ord_type_to_fix(OrderType::Limit), "2");
-        assert_eq!(alice_ord_type_to_fix(OrderType::StopLimit { stop_price: 0 }), "2");
+        assert_eq!(
+            alice_ord_type_to_fix(OrderType::StopLimit { stop_price: 0 }),
+            "2"
+        );
     }
 
     // --- TimeInForce ---
@@ -271,5 +274,190 @@ mod tests {
         assert_eq!(fill.price, 48_000);
         assert_eq!(fill.quantity, 3);
         assert_eq!(fill.timestamp_ns, 9_999);
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional convert tests: edge cases and error paths
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_fix_side_invalid_values() {
+        assert_eq!(fix_side_to_alice(""), None);
+        assert_eq!(fix_side_to_alice("0"), None);
+        assert_eq!(fix_side_to_alice("3"), None);
+        assert_eq!(fix_side_to_alice("buy"), None);
+        assert_eq!(fix_side_to_alice("11"), None);
+    }
+
+    #[test]
+    fn test_fix_ord_type_invalid_values() {
+        assert_eq!(fix_ord_type_to_alice(""), None);
+        assert_eq!(fix_ord_type_to_alice("0"), None);
+        assert_eq!(fix_ord_type_to_alice("3"), None);
+        assert_eq!(fix_ord_type_to_alice("limit"), None);
+    }
+
+    #[test]
+    fn test_fix_tif_invalid_values() {
+        assert_eq!(fix_tif_to_alice(""), None);
+        assert_eq!(fix_tif_to_alice("2"), None);
+        assert_eq!(fix_tif_to_alice("5"), None);
+        assert_eq!(fix_tif_to_alice("7"), None);
+        assert_eq!(fix_tif_to_alice("gtc"), None);
+    }
+
+    #[test]
+    fn test_alice_tif_gtd_with_expiry() {
+        let tif = TimeInForce::GTD {
+            expiry_ns: 1_000_000_000,
+        };
+        assert_eq!(alice_tif_to_fix(tif), "6");
+    }
+
+    #[test]
+    fn test_alice_ord_type_stop_limit_with_price() {
+        let ot = OrderType::StopLimit { stop_price: 45_000 };
+        assert_eq!(alice_ord_type_to_fix(ot), "2");
+    }
+
+    #[test]
+    fn test_side_roundtrip_bid() {
+        let fix_val = alice_side_to_fix(Side::Bid);
+        assert_eq!(fix_side_to_alice(fix_val), Some(Side::Bid));
+    }
+
+    #[test]
+    fn test_side_roundtrip_ask() {
+        let fix_val = alice_side_to_fix(Side::Ask);
+        assert_eq!(fix_side_to_alice(fix_val), Some(Side::Ask));
+    }
+
+    #[test]
+    fn test_ord_type_roundtrip_market() {
+        let fix_val = alice_ord_type_to_fix(OrderType::Market);
+        assert_eq!(fix_ord_type_to_alice(fix_val), Some(OrderType::Market));
+    }
+
+    #[test]
+    fn test_ord_type_roundtrip_limit() {
+        let fix_val = alice_ord_type_to_fix(OrderType::Limit);
+        assert_eq!(fix_ord_type_to_alice(fix_val), Some(OrderType::Limit));
+    }
+
+    #[test]
+    fn test_tif_roundtrip_gtc() {
+        let fix_val = alice_tif_to_fix(TimeInForce::GTC);
+        assert_eq!(fix_tif_to_alice(fix_val), Some(TimeInForce::GTC));
+    }
+
+    #[test]
+    fn test_tif_roundtrip_ioc() {
+        let fix_val = alice_tif_to_fix(TimeInForce::IOC);
+        assert_eq!(fix_tif_to_alice(fix_val), Some(TimeInForce::IOC));
+    }
+
+    #[test]
+    fn test_tif_roundtrip_fok() {
+        let fix_val = alice_tif_to_fix(TimeInForce::FOK);
+        assert_eq!(fix_tif_to_alice(fix_val), Some(TimeInForce::FOK));
+    }
+
+    #[test]
+    fn test_parse_execution_report_missing_exec_id() {
+        let mut msg = FixMessage::new("FIX.4.4", "8");
+        msg.set(tag::ORDER_ID, "10")
+            .set(tag::CL_ORD_ID, "42")
+            .set(tag::LAST_PX, "50000")
+            .set(tag::LAST_QTY, "5");
+        // Missing EXEC_ID -> should return None.
+        assert!(parse_execution_report(&msg).is_none());
+    }
+
+    #[test]
+    fn test_parse_execution_report_missing_order_id() {
+        let mut msg = FixMessage::new("FIX.4.4", "8");
+        msg.set(tag::EXEC_ID, "99")
+            .set(tag::CL_ORD_ID, "42")
+            .set(tag::LAST_PX, "50000")
+            .set(tag::LAST_QTY, "5");
+        assert!(parse_execution_report(&msg).is_none());
+    }
+
+    #[test]
+    fn test_parse_execution_report_missing_cl_ord_id() {
+        let mut msg = FixMessage::new("FIX.4.4", "8");
+        msg.set(tag::EXEC_ID, "99")
+            .set(tag::ORDER_ID, "10")
+            .set(tag::LAST_PX, "50000")
+            .set(tag::LAST_QTY, "5");
+        assert!(parse_execution_report(&msg).is_none());
+    }
+
+    #[test]
+    fn test_parse_execution_report_missing_last_qty() {
+        let mut msg = FixMessage::new("FIX.4.4", "8");
+        msg.set(tag::EXEC_ID, "99")
+            .set(tag::ORDER_ID, "10")
+            .set(tag::CL_ORD_ID, "42")
+            .set(tag::LAST_PX, "50000");
+        assert!(parse_execution_report(&msg).is_none());
+    }
+
+    #[test]
+    fn test_parse_execution_report_non_numeric_last_px() {
+        let mut msg = FixMessage::new("FIX.4.4", "8");
+        msg.set(tag::EXEC_ID, "99")
+            .set(tag::ORDER_ID, "10")
+            .set(tag::CL_ORD_ID, "42")
+            .set(tag::LAST_PX, "not_a_number")
+            .set(tag::LAST_QTY, "5");
+        assert!(parse_execution_report(&msg).is_none());
+    }
+
+    #[test]
+    fn test_parse_execution_report_transact_time_defaults_to_zero() {
+        // TransactTime is a string timestamp, not parseable as u64.
+        let mut msg = FixMessage::new("FIX.4.4", "8");
+        msg.set(tag::EXEC_ID, "99")
+            .set(tag::ORDER_ID, "10")
+            .set(tag::CL_ORD_ID, "42")
+            .set(tag::LAST_PX, "50000")
+            .set(tag::LAST_QTY, "5")
+            .set(tag::TRANSACT_TIME, "20260101-12:00:00.000");
+        let fill = parse_execution_report(&msg).expect("should produce a Fill");
+        // Non-numeric TransactTime defaults to 0.
+        assert_eq!(fill.timestamp_ns, 0);
+    }
+
+    #[test]
+    fn test_parse_execution_report_no_transact_time() {
+        // TransactTime absent entirely.
+        let mut msg = FixMessage::new("FIX.4.4", "8");
+        msg.set(tag::EXEC_ID, "99")
+            .set(tag::ORDER_ID, "10")
+            .set(tag::CL_ORD_ID, "42")
+            .set(tag::LAST_PX, "50000")
+            .set(tag::LAST_QTY, "5");
+        let fill = parse_execution_report(&msg).expect("should produce a Fill");
+        assert_eq!(fill.timestamp_ns, 0);
+    }
+
+    #[test]
+    fn test_parse_execution_report_negative_price() {
+        let mut msg = FixMessage::new("FIX.4.4", "8");
+        msg.set(tag::EXEC_ID, "1")
+            .set(tag::ORDER_ID, "2")
+            .set(tag::CL_ORD_ID, "3")
+            .set(tag::LAST_PX, "-100")
+            .set(tag::LAST_QTY, "1")
+            .set(tag::TRANSACT_TIME, "0");
+        let fill = parse_execution_report(&msg).expect("should produce a Fill");
+        assert_eq!(fill.price, -100);
+    }
+
+    #[test]
+    fn test_parse_execution_report_empty_message() {
+        let msg = FixMessage::new("FIX.4.4", "8");
+        assert!(parse_execution_report(&msg).is_none());
     }
 }

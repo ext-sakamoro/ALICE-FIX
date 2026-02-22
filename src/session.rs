@@ -17,10 +17,10 @@
 //! Active → (send Logout) → LogoutSent → (receive Logout) → Disconnected
 //! ```
 
-use alice_ledger::Order;
 use crate::builder::FixBuilder;
-use crate::convert::{alice_side_to_fix, alice_ord_type_to_fix, alice_tif_to_fix};
+use crate::convert::{alice_ord_type_to_fix, alice_side_to_fix, alice_tif_to_fix};
 use crate::tag;
+use alice_ledger::Order;
 
 /// Operational state of a FIX session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,9 +161,9 @@ impl FixSession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alice_ledger::{Order, OrderId, OrderType, Side, TimeInForce};
     use crate::parser;
     use crate::tag;
+    use alice_ledger::{Order, OrderId, OrderType, Side, TimeInForce};
 
     fn make_session() -> FixSession {
         FixSession::new("ALICE", "BROKER", "FIX.4.4")
@@ -252,7 +252,7 @@ mod tests {
 
         assert_eq!(msg.msg_type, "D");
         assert_eq!(msg.get(tag::SYMBOL), Some("BTCUSD"));
-        assert_eq!(msg.get(tag::SIDE), Some("1"));   // Bid = "1"
+        assert_eq!(msg.get(tag::SIDE), Some("1")); // Bid = "1"
         assert_eq!(msg.get(tag::ORD_TYPE), Some("2")); // Limit = "2"
         assert_eq!(msg.get_i64(tag::PRICE), Some(50_000));
         assert_eq!(msg.get_u64(tag::ORDER_QTY), Some(10));
@@ -273,5 +273,142 @@ mod tests {
         assert_eq!(m1.get_u64(tag::MSG_SEQ_NUM), Some(1));
         assert_eq!(m2.get_u64(tag::MSG_SEQ_NUM), Some(2));
         assert_eq!(m3.get_u64(tag::MSG_SEQ_NUM), Some(3));
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional session tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_logon_changes_state_to_logon_sent() {
+        let mut session = make_session();
+        assert_eq!(*session.state(), SessionState::Disconnected);
+        let _ = session.build_logon();
+        assert_eq!(*session.state(), SessionState::LogonSent);
+    }
+
+    #[test]
+    fn test_logout_changes_state_to_logout_sent() {
+        let mut session = make_session();
+        let _ = session.build_logout();
+        assert_eq!(*session.state(), SessionState::LogoutSent);
+    }
+
+    #[test]
+    fn test_heartbeat_does_not_change_state() {
+        let mut session = make_session();
+        let _ = session.build_logon();
+        assert_eq!(*session.state(), SessionState::LogonSent);
+        let _ = session.build_heartbeat();
+        // State should remain LogonSent.
+        assert_eq!(*session.state(), SessionState::LogonSent);
+    }
+
+    #[test]
+    fn test_multiple_logons_advance_seq() {
+        let mut session = make_session();
+        let b1 = session.build_logon();
+        let b2 = session.build_logon();
+        let m1 = parser::parse(&b1).unwrap();
+        let m2 = parser::parse(&b2).unwrap();
+        assert_eq!(m1.get_u64(tag::MSG_SEQ_NUM), Some(1));
+        assert_eq!(m2.get_u64(tag::MSG_SEQ_NUM), Some(2));
+    }
+
+    #[test]
+    fn test_incoming_seq_starts_at_one() {
+        let mut session = make_session();
+        assert!(!session.validate_incoming_seq(0));
+        assert!(session.validate_incoming_seq(1));
+    }
+
+    #[test]
+    fn test_incoming_seq_gap_rejection() {
+        let mut session = make_session();
+        assert!(session.validate_incoming_seq(1));
+        // Skip 2, send 3 -> should fail.
+        assert!(!session.validate_incoming_seq(3));
+        // Sequence 2 is still expected.
+        assert!(session.validate_incoming_seq(2));
+    }
+
+    #[test]
+    fn test_build_new_order_ask_side() {
+        let mut session = make_session();
+        let order = Order {
+            id: OrderId(100),
+            side: Side::Ask,
+            order_type: OrderType::Limit,
+            price: 60_000,
+            quantity: 25,
+            filled_quantity: 0,
+            timestamp_ns: 0,
+            time_in_force: TimeInForce::IOC,
+        };
+        let bytes = session.build_new_order(&order, "ETHUSD");
+        let msg = parser::parse(&bytes).unwrap();
+        assert_eq!(msg.msg_type, "D");
+        assert_eq!(msg.get(tag::SIDE), Some("2")); // Ask = "2"
+        assert_eq!(msg.get(tag::SYMBOL), Some("ETHUSD"));
+        assert_eq!(msg.get(tag::TIME_IN_FORCE), Some("3")); // IOC = "3"
+        assert_eq!(msg.get_u64(tag::ORDER_QTY), Some(25));
+    }
+
+    #[test]
+    fn test_build_new_order_market_type() {
+        let mut session = make_session();
+        let order = Order {
+            id: OrderId(200),
+            side: Side::Bid,
+            order_type: OrderType::Market,
+            price: 0,
+            quantity: 50,
+            filled_quantity: 0,
+            timestamp_ns: 0,
+            time_in_force: TimeInForce::FOK,
+        };
+        let bytes = session.build_new_order(&order, "BTCUSD");
+        let msg = parser::parse(&bytes).unwrap();
+        assert_eq!(msg.get(tag::ORD_TYPE), Some("1")); // Market = "1"
+        assert_eq!(msg.get(tag::TIME_IN_FORCE), Some("4")); // FOK = "4"
+    }
+
+    #[test]
+    fn test_session_state_debug() {
+        let state = SessionState::Active;
+        assert_eq!(format!("{state:?}"), "Active");
+    }
+
+    #[test]
+    fn test_session_state_clone() {
+        let s1 = SessionState::LogonSent;
+        let s2 = s1;
+        assert_eq!(s1, s2);
+    }
+
+    #[test]
+    fn test_full_session_lifecycle_seq_numbers() {
+        let mut session = make_session();
+        // Logon = seq 1
+        let b1 = session.build_logon();
+        assert_eq!(*session.state(), SessionState::LogonSent);
+        // Heartbeat = seq 2
+        let b2 = session.build_heartbeat();
+        // New order = seq 3
+        let order = make_limit_order(1, Side::Bid, 100, 10);
+        let b3 = session.build_new_order(&order, "SYM");
+        // Logout = seq 4
+        let b4 = session.build_logout();
+        assert_eq!(*session.state(), SessionState::LogoutSent);
+
+        let m1 = parser::parse(&b1).unwrap();
+        let m2 = parser::parse(&b2).unwrap();
+        let m3 = parser::parse(&b3).unwrap();
+        let m4 = parser::parse(&b4).unwrap();
+
+        assert_eq!(m1.get_u64(tag::MSG_SEQ_NUM), Some(1));
+        assert_eq!(m2.get_u64(tag::MSG_SEQ_NUM), Some(2));
+        assert_eq!(m3.get_u64(tag::MSG_SEQ_NUM), Some(3));
+        assert_eq!(m4.get_u64(tag::MSG_SEQ_NUM), Some(4));
     }
 }

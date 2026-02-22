@@ -23,7 +23,7 @@ use crate::tag;
 
 /// FIX message serializer.
 ///
-/// Fields are appended in the order [`field`] is called. Tag 8 (BeginString),
+/// Fields are appended in the order [`Self::field`] is called. Tag 8 (BeginString),
 /// tag 9 (BodyLength), tag 35 (MsgType), and tag 10 (Checksum) are managed
 /// automatically.
 pub struct FixBuilder {
@@ -208,5 +208,94 @@ mod tests {
         assert_eq!(chk_field.len(), 7);
         let digits = &chk_field[3..6];
         assert!(digits.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional builder tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_build_field_u64() {
+        let bytes = FixBuilder::new("FIX.4.4", "D")
+            .field(tag::SENDER_COMP_ID, "X")
+            .field_u64(tag::ORDER_QTY, 500)
+            .build();
+        let msg = parser::parse(&bytes).unwrap();
+        assert_eq!(msg.get_u64(tag::ORDER_QTY), Some(500));
+    }
+
+    #[test]
+    fn test_build_field_i64_positive() {
+        let bytes = FixBuilder::new("FIX.4.4", "D")
+            .field(tag::SENDER_COMP_ID, "X")
+            .field_i64(tag::PRICE, 99999)
+            .build();
+        let msg = parser::parse(&bytes).unwrap();
+        assert_eq!(msg.get_i64(tag::PRICE), Some(99999));
+    }
+
+    #[test]
+    fn test_build_no_user_fields() {
+        // Build a message with only the mandatory type and version.
+        let bytes = FixBuilder::new("FIX.4.4", "0").build();
+        let msg = parser::parse(&bytes).unwrap();
+        assert_eq!(msg.msg_type, "0");
+        assert_eq!(msg.begin_string, "FIX.4.4");
+    }
+
+    #[test]
+    fn test_build_body_length_is_correct() {
+        let bytes = FixBuilder::new("FIX.4.4", "D")
+            .field(tag::SENDER_COMP_ID, "ALICE")
+            .build();
+        // Extract body length from the raw bytes.
+        let s = String::from_utf8_lossy(&bytes);
+        let tag9_start = s.find("9=").unwrap() + 2;
+        let tag9_end = s[tag9_start..].find('\x01').unwrap() + tag9_start;
+        let body_len: usize = s[tag9_start..tag9_end].parse().unwrap();
+
+        // Body is from after "9=N\x01" to before "10=XXX\x01"
+        let body_start = tag9_end + 1; // after the SOH following tag 9
+        let body_end = bytes.len() - 7; // before "10=XXX\x01"
+        assert_eq!(body_end - body_start, body_len);
+    }
+
+    #[test]
+    fn test_build_multiple_fields_order_preserved() {
+        let bytes = FixBuilder::new("FIX.4.4", "D")
+            .field(tag::SENDER_COMP_ID, "A")
+            .field(tag::TARGET_COMP_ID, "B")
+            .field(tag::CL_ORD_ID, "ORD-1")
+            .field(tag::SYMBOL, "ETHUSD")
+            .build();
+        let msg = parser::parse(&bytes).unwrap();
+        assert_eq!(msg.get(tag::SENDER_COMP_ID), Some("A"));
+        assert_eq!(msg.get(tag::TARGET_COMP_ID), Some("B"));
+        assert_eq!(msg.get(tag::CL_ORD_ID), Some("ORD-1"));
+        assert_eq!(msg.get(tag::SYMBOL), Some("ETHUSD"));
+    }
+
+    #[test]
+    fn test_build_fixt11() {
+        let bytes = FixBuilder::new("FIXT.1.1", "A").build();
+        let msg = parser::parse(&bytes).unwrap();
+        assert_eq!(msg.begin_string, "FIXT.1.1");
+        assert_eq!(msg.msg_type, "A");
+    }
+
+    #[test]
+    fn test_build_empty_value_field() {
+        let bytes = FixBuilder::new("FIX.4.4", "0").field(tag::TEXT, "").build();
+        let msg = parser::parse(&bytes).unwrap();
+        assert_eq!(msg.get(tag::TEXT), Some(""));
+    }
+
+    #[test]
+    fn test_build_large_seq_number() {
+        let bytes = FixBuilder::new("FIX.4.4", "0")
+            .field_u64(tag::MSG_SEQ_NUM, 999_999_999)
+            .build();
+        let msg = parser::parse(&bytes).unwrap();
+        assert_eq!(msg.get_u64(tag::MSG_SEQ_NUM), Some(999_999_999));
     }
 }
