@@ -37,7 +37,7 @@ pub fn fix_side_to_alice(fix_side: &str) -> Option<Side> {
 /// - [`Side::Ask`] → `"2"`
 #[inline(always)]
 #[must_use]
-pub fn alice_side_to_fix(side: Side) -> &'static str {
+pub const fn alice_side_to_fix(side: Side) -> &'static str {
     match side {
         Side::Bid => "1",
         Side::Ask => "2",
@@ -70,7 +70,7 @@ pub fn fix_ord_type_to_alice(fix_type: &str) -> Option<OrderType> {
 /// - [`OrderType::StopLimit`] → `"2"` (closest FIX equivalent is Limit)
 #[inline(always)]
 #[must_use]
-pub fn alice_ord_type_to_fix(order_type: OrderType) -> &'static str {
+pub const fn alice_ord_type_to_fix(order_type: OrderType) -> &'static str {
     match order_type {
         OrderType::Market => "1",
         OrderType::Limit | OrderType::StopLimit { .. } => "2",
@@ -109,7 +109,7 @@ pub fn fix_tif_to_alice(fix_tif: &str) -> Option<TimeInForce> {
 /// - [`TimeInForce::GTD`] → `"6"`
 #[inline(always)]
 #[must_use]
-pub fn alice_tif_to_fix(tif: TimeInForce) -> &'static str {
+pub const fn alice_tif_to_fix(tif: TimeInForce) -> &'static str {
     match tif {
         TimeInForce::GTC => "1",
         TimeInForce::IOC => "3",

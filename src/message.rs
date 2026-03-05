@@ -304,6 +304,6 @@ mod tests {
         // Confirm FixMessage uses HashMap (not BTreeMap) for O(1) field lookup.
         // This is a compile-time design verification: fields is HashMap<u32, String>.
         let msg = FixMessage::new("FIX.4.4", "D");
-        let _fields: &HashMap<u32, String> = &msg.fields;
+        let _: &HashMap<u32, String> = &msg.fields;
     }
 }

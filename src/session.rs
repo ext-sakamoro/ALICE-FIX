@@ -67,7 +67,7 @@ impl FixSession {
     /// Return the current session state.
     #[inline(always)]
     #[must_use]
-    pub fn state(&self) -> &SessionState {
+    pub const fn state(&self) -> &SessionState {
         &self.state
     }
 
@@ -76,7 +76,7 @@ impl FixSession {
     ///
     /// The counter starts at 1; the first call returns 1.
     #[inline(always)]
-    pub fn next_outgoing_seq(&mut self) -> u64 {
+    pub const fn next_outgoing_seq(&mut self) -> u64 {
         let seq = self.outgoing_seq;
         self.outgoing_seq += 1;
         seq
@@ -87,7 +87,7 @@ impl FixSession {
     /// Returns `true` and advances the expected counter when the sequence
     /// matches; returns `false` without updating state when it does not.
     #[inline(always)]
-    pub fn validate_incoming_seq(&mut self, seq: u64) -> bool {
+    pub const fn validate_incoming_seq(&mut self, seq: u64) -> bool {
         if seq == self.incoming_seq {
             self.incoming_seq += 1;
             true

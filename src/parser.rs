@@ -56,18 +56,18 @@ pub enum ParseError {
 impl core::fmt::Display for ParseError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            ParseError::EmptyInput => write!(f, "empty input"),
-            ParseError::MissingBeginString => write!(f, "missing BeginString (tag 8)"),
-            ParseError::MissingBodyLength => write!(f, "missing BodyLength (tag 9)"),
-            ParseError::MissingChecksum => write!(f, "missing or misplaced Checksum (tag 10)"),
-            ParseError::InvalidChecksum { expected, actual } => {
+            Self::EmptyInput => write!(f, "empty input"),
+            Self::MissingBeginString => write!(f, "missing BeginString (tag 8)"),
+            Self::MissingBodyLength => write!(f, "missing BodyLength (tag 9)"),
+            Self::MissingChecksum => write!(f, "missing or misplaced Checksum (tag 10)"),
+            Self::InvalidChecksum { expected, actual } => {
                 write!(
                     f,
                     "invalid checksum: expected {expected:03}, actual {actual:03}"
                 )
             }
-            ParseError::MalformedField(s) => write!(f, "malformed field: {s}"),
-            ParseError::InvalidTag(s) => write!(f, "invalid tag number: {s}"),
+            Self::MalformedField(s) => write!(f, "malformed field: {s}"),
+            Self::InvalidTag(s) => write!(f, "invalid tag number: {s}"),
         }
     }
 }
@@ -135,7 +135,7 @@ struct FieldIter<'a> {
 
 impl<'a> FieldIter<'a> {
     #[inline(always)]
-    fn new(input: &'a [u8]) -> Self {
+    const fn new(input: &'a [u8]) -> Self {
         Self { remaining: input }
     }
 }
@@ -561,7 +561,7 @@ mod tests {
     fn test_parse_tag_number_valid() {
         assert_eq!(parse_tag_number(b"49"), Some(49));
         assert_eq!(parse_tag_number(b"0"), Some(0));
-        assert_eq!(parse_tag_number(b"999999"), Some(999999));
+        assert_eq!(parse_tag_number(b"999999"), Some(999_999));
     }
 
     #[test]
