@@ -1,6 +1,6 @@
 [package]
 name = "alice-fix"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Moroya Sakamoto"]
 description = "FIX protocol 4.4/5.0 message parser, builder, and session management"
@@ -9,11 +9,12 @@ publish = false
 
 [lib]
 name = "alice_fix"
-crate-type = ["rlib"]
+crate-type = ["rlib", "staticlib", "cdylib"]
 
 [features]
 default = ["std"]
 std = []
+ffi = ["std"]   # C-ABI FFI (33 extern "C" functions)
 
 [dependencies]
 alice-ledger = { path = "../ALICE-Ledger" }

@@ -22,6 +22,7 @@ use alice_ledger::{Fill, OrderId, OrderType, Side, TimeInForce};
 /// - `"2"` → [`Side::Ask`] (Sell)
 /// - Any other value → `None`
 #[inline(always)]
+#[must_use]
 pub fn fix_side_to_alice(fix_side: &str) -> Option<Side> {
     match fix_side {
         "1" => Some(Side::Bid),
@@ -35,6 +36,7 @@ pub fn fix_side_to_alice(fix_side: &str) -> Option<Side> {
 /// - [`Side::Bid`] → `"1"`
 /// - [`Side::Ask`] → `"2"`
 #[inline(always)]
+#[must_use]
 pub fn alice_side_to_fix(side: Side) -> &'static str {
     match side {
         Side::Bid => "1",
@@ -46,12 +48,13 @@ pub fn alice_side_to_fix(side: Side) -> &'static str {
 // OrdType
 // ---------------------------------------------------------------------------
 
-/// Convert a FIX OrdType value (tag 40) to an ALICE-Ledger [`OrderType`].
+/// Convert a FIX `OrdType` value (tag 40) to an ALICE-Ledger [`OrderType`].
 ///
 /// - `"1"` → [`OrderType::Market`]
 /// - `"2"` → [`OrderType::Limit`]
 /// - Any other value → `None`
 #[inline(always)]
+#[must_use]
 pub fn fix_ord_type_to_alice(fix_type: &str) -> Option<OrderType> {
     match fix_type {
         "1" => Some(OrderType::Market),
@@ -60,17 +63,17 @@ pub fn fix_ord_type_to_alice(fix_type: &str) -> Option<OrderType> {
     }
 }
 
-/// Convert an ALICE-Ledger [`OrderType`] to the FIX OrdType value for tag 40.
+/// Convert an ALICE-Ledger [`OrderType`] to the FIX `OrdType` value for tag 40.
 ///
 /// - [`OrderType::Market`]    → `"1"`
 /// - [`OrderType::Limit`]     → `"2"`
 /// - [`OrderType::StopLimit`] → `"2"` (closest FIX equivalent is Limit)
 #[inline(always)]
+#[must_use]
 pub fn alice_ord_type_to_fix(order_type: OrderType) -> &'static str {
     match order_type {
         OrderType::Market => "1",
-        OrderType::Limit => "2",
-        OrderType::StopLimit { .. } => "2",
+        OrderType::Limit | OrderType::StopLimit { .. } => "2",
     }
 }
 
@@ -78,7 +81,7 @@ pub fn alice_ord_type_to_fix(order_type: OrderType) -> &'static str {
 // TimeInForce
 // ---------------------------------------------------------------------------
 
-/// Convert a FIX TimeInForce value (tag 59) to an ALICE-Ledger [`TimeInForce`].
+/// Convert a FIX `TimeInForce` value (tag 59) to an ALICE-Ledger [`TimeInForce`].
 ///
 /// - `"0"` (Day) → [`TimeInForce::GTC`] (closest semantic match)
 /// - `"1"` (GTC) → [`TimeInForce::GTC`]
@@ -87,17 +90,17 @@ pub fn alice_ord_type_to_fix(order_type: OrderType) -> &'static str {
 /// - `"6"` (GTD) → [`TimeInForce::GTC`] (expiry not carried in tag 59 alone)
 /// - Any other value → `None`
 #[inline(always)]
+#[must_use]
 pub fn fix_tif_to_alice(fix_tif: &str) -> Option<TimeInForce> {
     match fix_tif {
-        "0" | "6" => Some(TimeInForce::GTC),
-        "1" => Some(TimeInForce::GTC),
+        "0" | "1" | "6" => Some(TimeInForce::GTC),
         "3" => Some(TimeInForce::IOC),
         "4" => Some(TimeInForce::FOK),
         _ => None,
     }
 }
 
-/// Convert an ALICE-Ledger [`TimeInForce`] to the FIX TimeInForce value for
+/// Convert an ALICE-Ledger [`TimeInForce`] to the FIX `TimeInForce` value for
 /// tag 59.
 ///
 /// - [`TimeInForce::GTC`] → `"1"`
@@ -105,6 +108,7 @@ pub fn fix_tif_to_alice(fix_tif: &str) -> Option<TimeInForce> {
 /// - [`TimeInForce::FOK`] → `"4"`
 /// - [`TimeInForce::GTD`] → `"6"`
 #[inline(always)]
+#[must_use]
 pub fn alice_tif_to_fix(tif: TimeInForce) -> &'static str {
     match tif {
         TimeInForce::GTC => "1",
@@ -118,13 +122,14 @@ pub fn alice_tif_to_fix(tif: TimeInForce) -> &'static str {
 // ExecutionReport → Fill
 // ---------------------------------------------------------------------------
 
-/// Parse a FIX ExecutionReport message (MsgType "8") into an ALICE-Ledger
+/// Parse a FIX `ExecutionReport` message (`MsgType` "8") into an ALICE-Ledger
 /// [`Fill`].
 ///
-/// Required tags: 17 (ExecID), 37 (OrderID), 11 (ClOrdID), 31 (LastPx),
-/// 32 (LastQty), 60 (TransactTime).
+/// Required tags: 17 (`ExecID`), 37 (`OrderID`), 11 (`ClOrdID`), 31 (`LastPx`),
+/// 32 (`LastQty`), 60 (`TransactTime`).
 ///
 /// Returns `None` if any required tag is absent or cannot be parsed.
+#[must_use]
 pub fn parse_execution_report(msg: &FixMessage) -> Option<Fill> {
     // Tag 17 (ExecID) — used as taker_id for the fill record.
     let exec_id: u64 = msg.get_u64(tag::EXEC_ID)?;

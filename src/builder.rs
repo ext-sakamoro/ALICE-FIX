@@ -7,7 +7,7 @@
 //!
 //! [`FixBuilder`] accumulates tag/value pairs and serializes them to a
 //! complete FIX wire-format byte vector, including the auto-computed
-//! BodyLength (tag 9) and Checksum (tag 10).
+//! `BodyLength` (tag 9) and Checksum (tag 10).
 //!
 //! ## Build Flow
 //!
@@ -23,8 +23,8 @@ use crate::tag;
 
 /// FIX message serializer.
 ///
-/// Fields are appended in the order [`Self::field`] is called. Tag 8 (BeginString),
-/// tag 9 (BodyLength), tag 35 (MsgType), and tag 10 (Checksum) are managed
+/// Fields are appended in the order [`Self::field`] is called. Tag 8 (`BeginString`),
+/// tag 9 (`BodyLength`), tag 35 (`MsgType`), and tag 10 (Checksum) are managed
 /// automatically.
 pub struct FixBuilder {
     begin_string: String,
@@ -36,6 +36,7 @@ pub struct FixBuilder {
 impl FixBuilder {
     /// Create a new builder for a message of the given FIX version and type.
     #[inline(always)]
+    #[must_use]
     pub fn new(begin_string: &str, msg_type: &str) -> Self {
         Self {
             begin_string: begin_string.to_string(),
@@ -74,7 +75,8 @@ impl FixBuilder {
     /// Serialize the message to FIX wire format.
     ///
     /// The returned bytes include the leading "8=..." and trailing "10=..."
-    /// fields with correctly computed BodyLength and Checksum.
+    /// fields with correctly computed `BodyLength` and Checksum.
+    #[must_use]
     pub fn build(&self) -> Vec<u8> {
         // Build the body: "35=<msg_type>\x01" + user fields.
         let mut body: Vec<u8> = Vec::new();

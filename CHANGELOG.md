@@ -2,6 +2,19 @@
 
 All notable changes to ALICE-FIX will be documented in this file.
 
+## [0.1.1] - 2026-03-04
+
+### Added
+- `ffi` — C-ABI FFI 33 `extern "C"` functions (Memory/Message/Builder/Parser/Session/Convert/Version)
+- Unity C# bindings — 33 DllImport + 5 RAII IDisposable handles (`bindings/unity/AliceFix.cs`)
+- UE5 C++ bindings — 33 extern C + 5 RAII unique_ptr handles (`bindings/ue5/AliceFix.h`)
+- FFI prefix: `af_fix_*`
+- README.md
+- 139 tests (124 core + 15 FFI)
+
+### Fixed
+- `cargo fmt` trailing space修正
+
 ## [0.1.0] - 2026-02-23
 
 ### Added

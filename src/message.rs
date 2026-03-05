@@ -10,7 +10,7 @@
 //! Iteration order is not guaranteed; sort the keys explicitly when
 //! deterministic output is required (e.g., in tests or logging).
 //!
-//! The structural tags 8 (BeginString), 9 (BodyLength), and 10 (Checksum)
+//! The structural tags 8 (`BeginString`), 9 (`BodyLength`), and 10 (Checksum)
 //! are not stored in [`FixMessage::fields`]; they are either captured in
 //! dedicated fields or reconstructed at serialisation time by [`crate::builder`].
 
@@ -24,7 +24,7 @@ use std::collections::HashMap;
 pub struct FixMessage {
     /// FIX version string from tag 8 (e.g., "FIX.4.4" or "FIXT.1.1").
     pub begin_string: String,
-    /// Message type from tag 35 (e.g., "D" for NewOrderSingle, "8" for ExecutionReport).
+    /// Message type from tag 35 (e.g., "D" for `NewOrderSingle`, "8" for `ExecutionReport`).
     pub msg_type: String,
     /// All non-structural tag/value pairs keyed by tag number.
     /// Uses [`HashMap`] for O(1) lookup on the hot path.
@@ -34,6 +34,7 @@ pub struct FixMessage {
 impl FixMessage {
     /// Create a new, empty FIX message with the given version and message type.
     #[inline(always)]
+    #[must_use]
     pub fn new(begin_string: &str, msg_type: &str) -> Self {
         Self {
             begin_string: begin_string.to_string(),
@@ -63,6 +64,7 @@ impl FixMessage {
     ///
     /// Returns `None` if the tag is absent or the value cannot be parsed.
     #[inline(always)]
+    #[must_use]
     pub fn get_i64(&self, tag: u32) -> Option<i64> {
         self.fields.get(&tag)?.parse().ok()
     }
@@ -71,6 +73,7 @@ impl FixMessage {
     ///
     /// Returns `None` if the tag is absent or the value cannot be parsed.
     #[inline(always)]
+    #[must_use]
     pub fn get_u64(&self, tag: u32) -> Option<u64> {
         self.fields.get(&tag)?.parse().ok()
     }

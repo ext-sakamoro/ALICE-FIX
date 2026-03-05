@@ -10,10 +10,10 @@
 //! ## Parsing Rules
 //!
 //! 1. Fields are delimited by the SOH character (`0x01`).
-//! 2. The first field must be tag 8 (BeginString).
-//! 3. The second field must be tag 9 (BodyLength); the declared length is validated.
+//! 2. The first field must be tag 8 (`BeginString`).
+//! 3. The second field must be tag 9 (`BodyLength`); the declared length is validated.
 //! 4. The last field must be tag 10 (Checksum); the checksum is validated.
-//! 5. Tag 35 (MsgType) must be present among the body fields.
+//! 5. Tag 35 (`MsgType`) must be present among the body fields.
 //! 6. All other fields are collected into [`FixMessage::fields`].
 //!
 //! ## Zero-copy design
@@ -34,9 +34,9 @@ pub const SOH: u8 = 0x01;
 pub enum ParseError {
     /// The input slice is empty.
     EmptyInput,
-    /// Tag 8 (BeginString) is not the first field.
+    /// Tag 8 (`BeginString`) is not the first field.
     MissingBeginString,
-    /// Tag 9 (BodyLength) is not the second field.
+    /// Tag 9 (`BodyLength`) is not the second field.
     MissingBodyLength,
     /// Tag 10 (Checksum) is absent or not the final field.
     MissingChecksum,
@@ -172,12 +172,17 @@ impl<'a> Iterator for FieldIter<'a> {
 
 /// Parse a raw FIX message byte slice into a [`FixMessage`].
 ///
-/// Validates the BeginString, BodyLength, and Checksum fields.
+/// Validates the `BeginString`, `BodyLength`, and Checksum fields.
 /// All remaining fields are collected into the returned message.
 ///
 /// The parser works directly on the input `&[u8]` without building an
 /// intermediate `Vec`; only the owned strings written into [`FixMessage`]
 /// allocate heap memory.
+///
+/// # Errors
+///
+/// Returns a [`ParseError`] if the input is malformed, missing required
+/// fields, or fails checksum validation.
 pub fn parse(input: &[u8]) -> Result<FixMessage, ParseError> {
     if input.is_empty() {
         return Err(ParseError::EmptyInput);
@@ -270,7 +275,7 @@ pub fn parse(input: &[u8]) -> Result<FixMessage, ParseError> {
     })
 }
 
-/// Parse a decimal `usize` from ASCII digit bytes (used for BodyLength).
+/// Parse a decimal `usize` from ASCII digit bytes (used for `BodyLength`).
 #[inline(always)]
 fn parse_body_length(bytes: &[u8]) -> Option<usize> {
     if bytes.is_empty() {

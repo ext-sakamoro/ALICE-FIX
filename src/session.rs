@@ -7,7 +7,7 @@
 //!
 //! [`FixSession`] manages the state and sequence numbers for a single FIX
 //! session. It provides helpers to build standard administrative messages
-//! (Logon, Logout, Heartbeat) and to construct a NewOrderSingle (35=D)
+//! (Logon, Logout, Heartbeat) and to construct a `NewOrderSingle` (35=D)
 //! from an ALICE-Ledger [`Order`].
 //!
 //! ## Session States
@@ -52,6 +52,7 @@ impl FixSession {
     ///
     /// Sequence numbers start at 1 per FIX specification.
     #[inline(always)]
+    #[must_use]
     pub fn new(sender: &str, target: &str, begin_string: &str) -> Self {
         Self {
             sender_comp_id: sender.to_string(),
@@ -65,6 +66,7 @@ impl FixSession {
 
     /// Return the current session state.
     #[inline(always)]
+    #[must_use]
     pub fn state(&self) -> &SessionState {
         &self.state
     }
@@ -94,7 +96,7 @@ impl FixSession {
         }
     }
 
-    /// Build a Logon message (MsgType "A") and transition to
+    /// Build a Logon message (`MsgType` "A") and transition to
     /// [`SessionState::LogonSent`].
     pub fn build_logon(&mut self) -> Vec<u8> {
         let seq = self.next_outgoing_seq();
@@ -102,7 +104,7 @@ impl FixSession {
         self.build_admin("A", seq)
     }
 
-    /// Build a Logout message (MsgType "5") and transition to
+    /// Build a Logout message (`MsgType` "5") and transition to
     /// [`SessionState::LogoutSent`].
     pub fn build_logout(&mut self) -> Vec<u8> {
         let seq = self.next_outgoing_seq();
@@ -110,13 +112,13 @@ impl FixSession {
         self.build_admin("5", seq)
     }
 
-    /// Build a Heartbeat message (MsgType "0") without changing session state.
+    /// Build a Heartbeat message (`MsgType` "0") without changing session state.
     pub fn build_heartbeat(&mut self) -> Vec<u8> {
         let seq = self.next_outgoing_seq();
         self.build_admin("0", seq)
     }
 
-    /// Build a NewOrderSingle (MsgType "D") from an ALICE-Ledger [`Order`].
+    /// Build a `NewOrderSingle` (`MsgType` "D") from an ALICE-Ledger [`Order`].
     ///
     /// The `symbol` parameter provides the instrument identifier (tag 55),
     /// since [`Order`] does not carry a symbol string.

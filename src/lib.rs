@@ -3,6 +3,19 @@
     Copyright (C) 2026 Moroya Sakamoto
 */
 
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::module_name_repetitions,
+    clippy::inline_always,
+    clippy::too_many_lines
+)]
+
 //! # ALICE-FIX
 //!
 //! FIX protocol 4.4/5.0 message parser, builder, and session management
@@ -37,6 +50,8 @@
 
 pub mod builder;
 pub mod convert;
+#[cfg(feature = "ffi")]
+pub mod ffi;
 pub mod message;
 pub mod parser;
 pub mod session;
