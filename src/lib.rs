@@ -48,12 +48,16 @@
 //! assert_eq!(msg.get(tag::SENDER_COMP_ID), Some("ALICE"));
 //! ```
 
+pub mod admin;
 pub mod builder;
 pub mod convert;
+pub mod execution_report;
 #[cfg(feature = "ffi")]
 pub mod ffi;
+pub mod gap_detect;
 pub mod message;
 pub mod parser;
+pub mod repeating_group;
 pub mod session;
 pub mod tag;
 
