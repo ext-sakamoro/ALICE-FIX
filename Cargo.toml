@@ -4,7 +4,7 @@ version = "0.1.1"
 edition = "2021"
 authors = ["Moroya Sakamoto"]
 description = "FIX protocol 4.4/5.0 message parser, builder, and session management"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [lib]
