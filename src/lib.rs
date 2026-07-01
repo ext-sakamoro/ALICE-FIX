@@ -13,7 +13,21 @@
     clippy::many_single_char_names,
     clippy::module_name_repetitions,
     clippy::inline_always,
-    clippy::too_many_lines
+    clippy::too_many_lines,
+    clippy::doc_markdown,
+    clippy::missing_const_for_fn,
+    clippy::too_long_first_doc_paragraph,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc,
+    clippy::match_same_arms,
+    clippy::manual_let_else,
+    clippy::bool_to_int_with_if,
+    clippy::borrow_as_ptr,
+    clippy::option_if_let_else,
+    clippy::ptr_as_ptr,
+    clippy::ref_as_ptr,
+    clippy::redundant_clone,
+    clippy::pub_underscore_fields
 )]
 
 //! # ALICE-FIX
@@ -50,6 +64,8 @@
 
 pub mod admin;
 pub mod builder;
+pub mod gap_recovery;
+pub use gap_recovery::{build_gap_fill, build_resend_request, GapRecoveryState, InboundOutcome};
 pub mod convert;
 pub mod execution_report;
 #[cfg(feature = "ffi")]
