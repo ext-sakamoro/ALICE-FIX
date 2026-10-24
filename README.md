@@ -87,7 +87,9 @@ assert_eq!(msg.get(tag::SENDER_COMP_ID), Some("ALICE"));
 
 ## License
 
-MIT
+`LicenseRef-Proprietary`. The text is [LICENSE-Proprietary](LICENSE-Proprietary).
+
+Enquiries: https://extoria.co.jp/
 
 ## Author
 
