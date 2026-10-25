@@ -1,0 +1,3 @@
+# the sibling commits CI clones next to this repository (Cargo.toml takes ALICE-Ledger by path, ALICE-Ledger takes ALICE-Sync)
+ALICE-Ledger 40f065f2f322a0f00ee2010daab0a00e809429ee
+ALICE-Sync 40898de22c84bdb8b705ba2bddbe4bfd0b26d15a
