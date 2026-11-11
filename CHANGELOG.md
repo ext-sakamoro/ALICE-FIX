@@ -5,6 +5,7 @@ All notable changes to ALICE-FIX will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- Cargo.lock: alice-db を main に取り直し、alice-db が前に rev で引いていた alice-serial も ALICE-Serial の main branch から (同じ commit 16b34eb) になった
 - 依存: `alice-ledger` (path) を ALICE-Ledger の main (git、branch、0.3.0) から取る `Cargo.lock` を追跡し、clippy と試験は `--locked` で走らせる CI は隣の repo の clone (`.github/alice-siblings`) をやめ、lock の alice-* がすべて git から来て `alice-det-math` が 1 つ以下であることを確かめる step を足した `scripts/preflight.sh` は生成し直した 公開 API は変わらない
 
 ## [0.1.1] - 2026-03-04
